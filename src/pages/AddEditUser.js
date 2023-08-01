@@ -1,60 +1,59 @@
 
 import React, { useState, useEffect } from 'react'
 import { Button, Form, Grid, Loader } from "semantic-ui-react"
-import { storage } from "../firebase/firebase"
+import { db, storage } from "../firebase/firebase"
 import { useParams, useNavigate } from "react-router-dom"
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { onSnapshot } from 'firebase/firestore'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 
 const initialState = {
   name: "",
   email: "",
   info: "",
-  contact: ""
+  
 }
 const AddEditUser = () => {
   const [data, setData] = useState(initialState);
-  const { name, email, info, contact } = data;
+  const { name, email, info,  } = data;
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState(null);
   const [errors, setErors] = useState({});
   const [isSubmit, setIsSubmit] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const uploadFile =()=>{
+    const uploadFile = () => {
       const name = new Date().getTime() + file.name;
-    const storageRef = ref(storage, file.name);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+      const storageRef = ref(storage, file.name);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
 
-    uploadTask.on("state_changed", (snapshot) => {
-      const progress =
-        (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-      switch (snapshot.state) {
-        case 'paused':
-          console.log("upload is pause")
-          break;  
-        case 'running':
-          console.log("upload is runing")
-          break;
-          case 'success':
-            console.log("upload is completed")
-          break;
-        default:
-          break;
-      }
-    },(error)=>{
-      console.log(error)
-    },
-    () =>{
-      getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>{
-        setData((prev) =>({...prev, img: downloadURL}));
-      })
-    }
-    );
+      uploadTask.on("state_changed", (snapshot) => {
+        const progress =
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setProgress(progress);
+        switch (snapshot.state) {
+          case 'paused':
+            console.log("upload is pause")
+            break;
+          case 'running':
+            console.log("upload is runing")
+            break;
+          default:
+            break;
+        }
+      }, (error) => {
+        console.log(error)
+      },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            setData((prev) => ({ ...prev, img: downloadURL }))
+          }); 
+        }
+      );
     };
-    file && uploadFile()
-  },[file]);
+    file && uploadFile();
+  }, [file]);
 
 
   const handleChange = (e) => {
@@ -71,16 +70,20 @@ const AddEditUser = () => {
     if (!info) {
       errors.info = "info is requeried"
     }
-    if (!contact) {
-      errors.contact = "conatc is requeried"
-    }
+    
     return errors;
   };
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     let errors = validate();
     if (Object.keys(errors).length) return setErors(errors);
+    setIsSubmit(true);
+    await addDoc(collection(db, "users"), {
+      ...data,
+      timestamp: serverTimestamp()
 
+    })
+    navigate("/");
   };
   return (
 
@@ -118,20 +121,14 @@ const AddEditUser = () => {
                       onChange={handleChange}
                       value={info} />
 
-                    <Form.Input
-                      label="contac"
-                      error={errors.contact ? { content: errors.contact } : null}
-                      placeholder="enter contac"
-                      name="contac"
-                      onChange={handleChange}
-                      value={contact} />
+                    
                     <Form.Input
                       label="upload"
                       type='file'
-                      onChange={(e) => setFile(e.target.files[0])} 
-                      />
+                      onChange={(e) => setFile(e.target.files[0])}
+                    />
 
-                    <Button primary type='submit' disabled={progress !== null && progress <100} >submit</Button>
+                    <Button primary type='submit' disabled={progress !== null && progress < 100} >submit</Button>
                   </Form>
 
                 </>

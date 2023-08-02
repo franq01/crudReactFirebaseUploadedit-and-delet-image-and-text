@@ -4,22 +4,35 @@ import { Button, Form, Grid, Loader } from "semantic-ui-react"
 import { db, storage } from "../firebase/firebase"
 import { useParams, useNavigate } from "react-router-dom"
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 
 const initialState = {
   name: "",
   email: "",
   info: "",
-  
+
 }
 const AddEditUser = () => {
   const [data, setData] = useState(initialState);
-  const { name, email, info,  } = data;
+  const { name, email, info, } = data;
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState(null);
   const [errors, setErors] = useState({});
   const [isSubmit, setIsSubmit] = useState(false);
   const navigate = useNavigate();
+  const { id } = useParams();
+
+  useEffect(() => {
+    id && getSingleUser();
+  }, [id])
+
+  const getSingleUser = async () => {
+    const docRef = doc(db, "users", id);
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      setData({ ...snapshot.data() });
+    }
+  }
 
   useEffect(() => {
     const uploadFile = () => {
@@ -48,7 +61,7 @@ const AddEditUser = () => {
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
             setData((prev) => ({ ...prev, img: downloadURL }))
-          }); 
+          });
         }
       );
     };
@@ -70,7 +83,7 @@ const AddEditUser = () => {
     if (!info) {
       errors.info = "info is requeried"
     }
-    
+
     return errors;
   };
   const handleSubmit = async (e) => {
@@ -78,11 +91,30 @@ const AddEditUser = () => {
     let errors = validate();
     if (Object.keys(errors).length) return setErors(errors);
     setIsSubmit(true);
-    await addDoc(collection(db, "users"), {
-      ...data,
-      timestamp: serverTimestamp()
+    if (!id) {
+      try {
+        await addDoc(collection(db, "users"), {
+          ...data,
+          timestamp: serverTimestamp()
 
-    })
+        })
+      } catch (error) {
+        console.error(error);
+      }
+
+    } else {
+      try {
+        await updateDoc(doc(db, "users",id), {
+          ...data,
+          timestamp: serverTimestamp()
+
+        })
+      } catch (error) {
+        console.error(error);
+      }
+
+    }
+
     navigate("/");
   };
   return (
@@ -94,7 +126,7 @@ const AddEditUser = () => {
             <div>
               {isSubmit ? < Loader active inline="centered" size='huge' /> : (
                 <>
-                  <h2>add user</h2>
+                  <h2>{id ? "update User" : "Add user"}</h2>
                   <Form onSubmit={handleSubmit}>
                     <Form.Input
                       label="name"
@@ -121,7 +153,7 @@ const AddEditUser = () => {
                       onChange={handleChange}
                       value={info} />
 
-                    
+
                     <Form.Input
                       label="upload"
                       type='file'
